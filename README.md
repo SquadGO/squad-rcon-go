@@ -17,7 +17,7 @@ import (
 )
 
 func main() {
-  r, err := Dial("ip", "port", "password")
+  r, err := rcon.Dial("ip", "port", "password")
   if err != nil {
     return
   }
