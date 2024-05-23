@@ -4,8 +4,8 @@ This library is designed for the game Squad, it will give you the ability to eas
 
 ## Install
 
-```console
-$ go get github.com/iamalone98/squad-rcon-go
+```text
+go get github.com/iamalone98/squad-rcon-go
 ```
 
 ## Quick start example
@@ -17,22 +17,22 @@ import (
 )
 
 func main() {
-  rcon, err := Dial("ip", "port", "password")
+  r, err := Dial("ip", "port", "password")
   if err != nil {
     return
   }
 
-  defer rcon.Close()
+  defer r.Close()
 
   // Displays player messages, team kills, bans, kicks, squad creation and warns
-  rcon.OnData(func(data string) {
+  r.OnData(func(data string) {
     fmt.Println(data)
   })
 
-  playersData := rcon.Execute("ListPlayers")
+  playersData := r.Execute("ListPlayers")
   fmt.Println(playersData)
 
-  squadsData := rcon.Execute("ListSquads")
+  squadsData := r.Execute("ListSquads")
   fmt.Println(squadsData)
 
   // Use to prevent the program from ending
