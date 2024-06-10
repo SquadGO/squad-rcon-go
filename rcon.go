@@ -23,33 +23,30 @@ const (
 	EXECUTE_COMMAND_ID = 50
 )
 
-type Rcon struct {
+var (
+	lastDataBuffer = make([]byte, 0)
+	resExecuteChan = make(chan string)
+	resServerChan  = make(chan string)
+	wg             sync.WaitGroup
 	host           string
 	port           string
 	password       string
 	responseBody   string
-	resExecuteChan chan string
-	resServerChan  chan string
-	lastDataBuffer []byte
-	connected      bool
-	client         net.Conn
-	wg             sync.WaitGroup
+)
+
+type Rcon struct {
+	connected bool
+	client    net.Conn
 }
 
 func Dial(host, port, password string) (*Rcon, error) {
 	r := &Rcon{
-		host:           host,
-		port:           port,
-		password:       password,
-		connected:      false,
-		lastDataBuffer: make([]byte, 0),
-		resExecuteChan: make(chan string),
-		resServerChan:  make(chan string),
+		connected: false,
 	}
 
-	r.wg.Add(1)
+	wg.Add(1)
 
-	if err := r.connect(); err != nil {
+	if err := r.connect(host, port); err != nil {
 		fmt.Println("Connection error:", err)
 
 		return nil, err
@@ -57,7 +54,7 @@ func Dial(host, port, password string) (*Rcon, error) {
 
 	fmt.Println("Connection successful")
 
-	if err := r.auth(); err != nil {
+	if err := r.auth(password); err != nil {
 		fmt.Println("Authorization error: ", err)
 
 		return nil, err
@@ -70,15 +67,15 @@ func Dial(host, port, password string) (*Rcon, error) {
 	}()
 
 	r.ping()
-	r.wg.Wait()
+	wg.Wait()
 
 	return r, nil
 }
 
 func (r *Rcon) Close() error {
 	r.connected = false
-	close(r.resExecuteChan)
-	close(r.resServerChan)
+	close(resExecuteChan)
+	close(resServerChan)
 	return r.client.Close()
 }
 
@@ -86,7 +83,7 @@ func (r *Rcon) Execute(command string) string {
 	r.client.Write(utils.Encode(SERVERDATA_COMMAND, EXECUTE_COMMAND_ID, command))
 	r.client.Write(utils.Encode(SERVERDATA_COMMAND, EMPTY_PACKET_ID, ""))
 
-	v, ok := <-r.resExecuteChan
+	v, ok := <-resExecuteChan
 
 	if ok {
 		return v
@@ -97,14 +94,14 @@ func (r *Rcon) Execute(command string) string {
 
 func (r *Rcon) OnData(callback func(string)) {
 	go func() {
-		for data := range r.resServerChan {
+		for data := range resServerChan {
 			callback(data)
 		}
 	}()
 }
 
-func (r *Rcon) connect() error {
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%s", r.host, r.port), 5*time.Second)
+func (r *Rcon) connect(host, port string) error {
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%s", host, port), 5*time.Second)
 	if err != nil {
 		return err
 	}
@@ -114,8 +111,8 @@ func (r *Rcon) connect() error {
 	return nil
 }
 
-func (r *Rcon) auth() error {
-	if _, err := r.client.Write(utils.Encode(SERVERDATA_AUTH, AUTH_PACKET_ID, r.password)); err != nil {
+func (r *Rcon) auth(password string) error {
+	if _, err := r.client.Write(utils.Encode(SERVERDATA_AUTH, AUTH_PACKET_ID, password)); err != nil {
 		return err
 	}
 
@@ -151,40 +148,40 @@ func (r *Rcon) byteReader() {
 }
 
 func (r *Rcon) byteParser(b byte) {
-	r.lastDataBuffer = append(r.lastDataBuffer, b)
+	lastDataBuffer = append(lastDataBuffer, b)
 
-	if len(r.lastDataBuffer) >= 7 {
-		size := int32(binary.LittleEndian.Uint32(r.lastDataBuffer[:4])) + 4
+	if len(lastDataBuffer) >= 7 {
+		size := int32(binary.LittleEndian.Uint32(lastDataBuffer[:4])) + 4
 
-		if r.lastDataBuffer[0] == 0 &&
-			r.lastDataBuffer[1] == 1 &&
-			r.lastDataBuffer[2] == 0 &&
-			r.lastDataBuffer[3] == 0 &&
-			r.lastDataBuffer[4] == 0 &&
-			r.lastDataBuffer[5] == 0 &&
-			r.lastDataBuffer[6] == 0 {
+		if lastDataBuffer[0] == 0 &&
+			lastDataBuffer[1] == 1 &&
+			lastDataBuffer[2] == 0 &&
+			lastDataBuffer[3] == 0 &&
+			lastDataBuffer[4] == 0 &&
+			lastDataBuffer[5] == 0 &&
+			lastDataBuffer[6] == 0 {
 
-			r.resExecuteChan <- r.responseBody
-			r.responseBody = ""
-			r.lastDataBuffer = make([]byte, 0)
+			resExecuteChan <- responseBody
+			responseBody = ""
+			lastDataBuffer = make([]byte, 0)
 		}
 
-		if int32(len(r.lastDataBuffer)) == size {
-			packet := utils.Decode(r.lastDataBuffer)
+		if int32(len(lastDataBuffer)) == size {
+			packet := utils.Decode(lastDataBuffer)
 			if packet.Type == SERVERDATA_RESPONSE && packet.ID != AUTH_PACKET_ID && packet.ID != EMPTY_PACKET_ID {
-				r.responseBody += packet.Body
+				responseBody += packet.Body
 			}
 
 			if packet.Type == SERVERDATA_SERVER {
-				r.resServerChan <- packet.Body
+				resServerChan <- packet.Body
 			}
 
 			if packet.ID == AUTH_PACKET_ID && packet.Type == 2 {
 				r.connected = true
-				r.wg.Done()
+				wg.Done()
 			}
 
-			r.lastDataBuffer = r.lastDataBuffer[size:]
+			lastDataBuffer = lastDataBuffer[size:]
 		}
 	}
 }
