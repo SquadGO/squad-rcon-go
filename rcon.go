@@ -181,16 +181,16 @@ func (r *Rcon) byteParser(b byte) {
 			lastDataBuffer[6] == 0 {
 
 			switch data := p.CommandParser(responseBody, lastCommand).(type) {
-			case Players:
+			case p.Players:
 				{
 					if r.onListPlayers != nil {
-						r.onListPlayers(data)
+						r.onListPlayers(Players(data))
 					}
 				}
-			case Squads:
+			case p.Squads:
 				{
 					if r.onListSquads != nil {
-						r.onListSquads(data)
+						r.onListSquads(Squads(data))
 					}
 				}
 			}
@@ -212,40 +212,40 @@ func (r *Rcon) byteParser(b byte) {
 				}
 
 				switch data := p.ChatParser(packet.Body).(type) {
-				case Warn:
+				case p.Warn:
 					{
 						if r.onWarn != nil {
-							r.onWarn(data)
+							r.onWarn(Warn(data))
 						}
 					}
-				case Kick:
+				case p.Kick:
 					{
 						if r.onKick != nil {
-							r.onKick(data)
+							r.onKick(Kick(data))
 						}
 					}
-				case Message:
+				case p.Message:
 					{
 						if r.onMessage != nil {
-							r.onMessage(data)
+							r.onMessage(Message(data))
 						}
 					}
-				case PosAdminCam:
+				case p.PosAdminCam:
 					{
 						if r.onPosAdminCam != nil {
-							r.onPosAdminCam(data)
+							r.onPosAdminCam(PosAdminCam(data))
 						}
 					}
-				case UnposAdminCam:
+				case p.UnposAdminCam:
 					{
 						if r.onUnposAdminCam != nil {
-							r.onUnposAdminCam(data)
+							r.onUnposAdminCam(UnposAdminCam(data))
 						}
 					}
-				case SquadCreated:
+				case p.SquadCreated:
 					{
 						if r.onSquadCreated != nil {
-							r.onSquadCreated(data)
+							r.onSquadCreated(SquadCreated(data))
 						}
 					}
 				}
