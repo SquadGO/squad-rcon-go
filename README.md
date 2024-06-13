@@ -29,16 +29,16 @@ func main() {
     fmt.Println(data)
   })
 
-	rcon.OnWarn(func(data rcon.Warn) {
-		fmt.Println("Warn: ", data)
-	})
+  rcon.OnWarn(func(data rcon.Warn) {
+    fmt.Println("Warn: ", data)
+  })
 
   data := r.Execute("ListPlayers")
   fmt.Println(data)
 
-	rcon.OnListSquads(func(data rcon.Squads) {
-		fmt.Println(data)
-	})
+  rcon.OnListSquads(func(data rcon.Squads) {
+    fmt.Println(data)
+  })
 
   r.Execute("ListSquads")
 
