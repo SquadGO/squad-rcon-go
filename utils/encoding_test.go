@@ -3,7 +3,7 @@ package utils
 import (
 	"testing"
 
-	cmp "github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp"
 )
 
 var mockBuf = []byte{14, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 84, 101, 115, 116, 0, 0}

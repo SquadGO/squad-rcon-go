@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	p "github.com/iamalone98/squad-rcon-go/internal/parser"
 	"github.com/iamalone98/squad-rcon-go/utils"
 )
 
@@ -25,18 +26,39 @@ const (
 
 var (
 	lastDataBuffer = make([]byte, 0)
-	resExecuteChan = make(chan string)
-	resServerChan  = make(chan string)
 	wg             sync.WaitGroup
 	host           string
 	port           string
 	password       string
 	responseBody   string
+	lastCommand    string
 )
 
+var (
+	executeChan = make(chan string)
+)
+
+type Warn p.Warn
+type Kick p.Kick
+type Message p.Message
+type PosAdminCam p.PosAdminCam
+type UnposAdminCam p.UnposAdminCam
+type SquadCreated p.SquadCreated
+type Players p.Players
+type Squads p.Squads
+
 type Rcon struct {
-	connected bool
-	client    net.Conn
+	connected       bool
+	client          net.Conn
+	onData          func(string)
+	onWarn          func(Warn)
+	onKick          func(Kick)
+	onMessage       func(Message)
+	onPosAdminCam   func(PosAdminCam)
+	onUnposAdminCam func(UnposAdminCam)
+	onSquadCreated  func(SquadCreated)
+	onListPlayers   func(Players)
+	onListSquads    func(Squads)
 }
 
 func Dial(host, port, password string) (*Rcon, error) {
@@ -74,8 +96,11 @@ func Dial(host, port, password string) (*Rcon, error) {
 
 func (r *Rcon) Close() error {
 	r.connected = false
-	close(resExecuteChan)
-	close(resServerChan)
+
+	lastCommand = ""
+	lastDataBuffer = make([]byte, 0)
+
+	close(executeChan)
 	return r.client.Close()
 }
 
@@ -83,21 +108,15 @@ func (r *Rcon) Execute(command string) string {
 	r.client.Write(utils.Encode(SERVERDATA_COMMAND, EXECUTE_COMMAND_ID, command))
 	r.client.Write(utils.Encode(SERVERDATA_COMMAND, EMPTY_PACKET_ID, ""))
 
-	v, ok := <-resExecuteChan
+	lastCommand = command
+
+	v, ok := <-executeChan
 
 	if ok {
 		return v
 	}
 
 	return ""
-}
-
-func (r *Rcon) OnData(callback func(string)) {
-	go func() {
-		for data := range resServerChan {
-			callback(data)
-		}
-	}()
 }
 
 func (r *Rcon) connect(host, port string) error {
@@ -161,7 +180,22 @@ func (r *Rcon) byteParser(b byte) {
 			lastDataBuffer[5] == 0 &&
 			lastDataBuffer[6] == 0 {
 
-			resExecuteChan <- responseBody
+			switch data := p.CommandParser(responseBody, lastCommand).(type) {
+			case Players:
+				{
+					if r.onListPlayers != nil {
+						r.onListPlayers(data)
+					}
+				}
+			case Squads:
+				{
+					if r.onListSquads != nil {
+						r.onListSquads(data)
+					}
+				}
+			}
+
+			executeChan <- responseBody
 			responseBody = ""
 			lastDataBuffer = make([]byte, 0)
 		}
@@ -173,7 +207,48 @@ func (r *Rcon) byteParser(b byte) {
 			}
 
 			if packet.Type == SERVERDATA_SERVER {
-				resServerChan <- packet.Body
+				if r.onData != nil {
+					r.onData(packet.Body)
+				}
+
+				switch data := p.ChatParser(packet.Body).(type) {
+				case Warn:
+					{
+						if r.onWarn != nil {
+							r.onWarn(data)
+						}
+					}
+				case Kick:
+					{
+						if r.onKick != nil {
+							r.onKick(data)
+						}
+					}
+				case Message:
+					{
+						if r.onMessage != nil {
+							r.onMessage(data)
+						}
+					}
+				case PosAdminCam:
+					{
+						if r.onPosAdminCam != nil {
+							r.onPosAdminCam(data)
+						}
+					}
+				case UnposAdminCam:
+					{
+						if r.onUnposAdminCam != nil {
+							r.onUnposAdminCam(data)
+						}
+					}
+				case SquadCreated:
+					{
+						if r.onSquadCreated != nil {
+							r.onSquadCreated(data)
+						}
+					}
+				}
 			}
 
 			if packet.ID == AUTH_PACKET_ID && packet.Type == 2 {

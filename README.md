@@ -13,7 +13,7 @@ go get github.com/iamalone98/squad-rcon-go
 ```golang
 import (
   "fmt"
-  "github.com/iamalone98/squad-rcon-go"
+  rcon "github.com/iamalone98/squad-rcon-go"
 )
 
 func main() {
@@ -29,15 +29,37 @@ func main() {
     fmt.Println(data)
   })
 
-  playersData := r.Execute("ListPlayers")
-  fmt.Println(playersData)
+	rcon.OnWarn(func(data rcon.Warn) {
+		fmt.Println("Warn: ", data)
+	})
 
-  squadsData := r.Execute("ListSquads")
-  fmt.Println(squadsData)
+  data := r.Execute("ListPlayers")
+  fmt.Println(data)
+
+	rcon.OnListSquads(func(data rcon.Squads) {
+		fmt.Println(data)
+	})
+
+  r.Execute("ListSquads")
 
   // Use to prevent the program from ending
-  for {
-
-  }
+  select {}
 }
 ```
+
+## API
+
+| Function            | Return            |
+| ------------------- | ----------------- |
+| **Close**           |                   |
+| **Dial**            | **Rcon**          |
+| **Execute**         | **String**        |
+| **OnData**          | **String**        |
+| **OnWarn**          | **Warn**          |
+| **OnKick**          | **Kick**          |
+| **OnMessage**       | **Message**       |
+| **OnPosAdminCam**   | **PosAdminCam**   |
+| **OnUnposAdminCam** | **UnposAdminCam** |
+| **OnSquadCreated**  | **SquadCreated**  |
+| **OnListPlayers**   | **Players**       |
+| **OnListSquads**    | **Squads**        |
