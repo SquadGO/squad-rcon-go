@@ -1,5 +1,9 @@
 package rcon
 
+func (r *Rcon) OnClose(fn func(error)) {
+	r.onClose = fn
+}
+
 func (r *Rcon) OnWarn(fn func(Warn)) {
 	r.onWarn = fn
 }

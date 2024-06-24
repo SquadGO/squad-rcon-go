@@ -24,6 +24,10 @@ func main() {
 
   defer r.Close()
 
+  r.OnClose(func(err error) {
+    fmt.Println(err)
+  })
+
   // Displays player messages, team kills, bans, kicks, squad creation and warns
   r.OnData(func(data string) {
     fmt.Println(data)
@@ -47,19 +51,17 @@ func main() {
 }
 ```
 
-## API
+## Rcon Events
 
-| Function            | Return            |
-| ------------------- | ----------------- |
-| **Close**           |                   |
-| **Dial**            | **Rcon**          |
-| **Execute**         | **String**        |
-| **OnData**          | **String**        |
-| **OnWarn**          | **Warn**          |
-| **OnKick**          | **Kick**          |
-| **OnMessage**       | **Message**       |
-| **OnPosAdminCam**   | **PosAdminCam**   |
-| **OnUnposAdminCam** | **UnposAdminCam** |
-| **OnSquadCreated**  | **SquadCreated**  |
-| **OnListPlayers**   | **Players**       |
-| **OnListSquads**    | **Squads**        |
+| Function            | Callback param type |
+| ------------------- | ------------------- |
+| **OnClose**         | **Error**           |
+| **OnData**          | **String**          |
+| **OnWarn**          | **Warn**            |
+| **OnKick**          | **Kick**            |
+| **OnMessage**       | **Message**         |
+| **OnPosAdminCam**   | **PosAdminCam**     |
+| **OnUnposAdminCam** | **UnposAdminCam**   |
+| **OnSquadCreated**  | **SquadCreated**    |
+| **OnListPlayers**   | **Players**         |
+| **OnListSquads**    | **Squads**          |
