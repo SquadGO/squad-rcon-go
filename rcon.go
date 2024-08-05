@@ -11,7 +11,7 @@ import (
 	"time"
 
 	p "github.com/iamalone98/squad-rcon-go/internal/parser"
-	"github.com/iamalone98/squad-rcon-go/utils"
+	"github.com/iamalone98/squad-rcon-go/internal/utils"
 )
 
 const (
