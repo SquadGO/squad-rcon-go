@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	p "github.com/iamalone98/squad-rcon-go/internal/parser"
-	"github.com/iamalone98/squad-rcon-go/internal/utils"
+	p "github.com/SquadGO/squad-rcon-go/internal/parser"
+	"github.com/SquadGO/squad-rcon-go/internal/utils"
 )
 
 const (

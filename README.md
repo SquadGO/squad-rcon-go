@@ -5,7 +5,7 @@ This library is designed for the game Squad, it will give you the ability to eas
 ## Install
 
 ```text
-go get github.com/iamalone98/squad-rcon-go
+go get github.com/SquadGO/squad-rcon-go
 ```
 
 ## Quick start example
@@ -13,7 +13,7 @@ go get github.com/iamalone98/squad-rcon-go
 ```golang
 import (
   "fmt"
-  rcon "github.com/iamalone98/squad-rcon-go"
+  rcon "github.com/SquadGO/squad-rcon-go"
 )
 
 func main() {
