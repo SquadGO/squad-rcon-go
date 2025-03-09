@@ -17,34 +17,47 @@ import (
 )
 
 func main() {
-  r, err := rcon.Dial("ip", "port", "password")
-  if err != nil {
-    return
-  }
+	r, err := rcon.NewRcon(rcon.RconConfig{host: "127.0.0.1", password: "123456", port: "27165", autoReconnect: true, autoReconnectDelay: 5})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
-  defer r.Close()
+	defer r.Close()
 
-  r.OnClose(func(err error) {
-    fmt.Println(err)
-  })
+	fmt.Println("[RCON] Connection successful")
 
-  // Displays player messages, team kills, bans, kicks, squad creation and warns
-  r.OnData(func(data string) {
-    fmt.Println(data)
-  })
+  /* Listeners works after first initialization */
 
-  rcon.OnWarn(func(data rcon.Warn) {
-    fmt.Println("Warn: ", data)
-  })
+	r.emitter.On("connected", func(_ interface{}) {
+		fmt.Println("[RCON] Connection successful")
+	})
 
-  data := r.Execute("ListPlayers")
-  fmt.Println(data)
+  r.emitter.On("close", func(_ interface{}) {
+		fmt.Println("[RCON] Connection closed")
+	})
 
-  rcon.OnListSquads(func(data rcon.Squads) {
-    fmt.Println(data)
-  })
+	r.emitter.On("error", func(err interface{}) {
+		fmt.Println(err)
+	})
 
-  r.Execute("ListSquads")
+	r.emitter.On("data", func(data interface{}) {
+		fmt.Println("Data: ", data)
+	})
+
+  r.emitter.On("CHAT_MESSAGE", func(data interface{}) {
+		if v, ok := data.(rcon.Message); ok {
+			fmt.Println("Message: ", v.Message)
+		}
+	})
+
+	r.emitter.On("ListPlayers", func(data interface{}) {
+		if v, ok := data.(rcon.Players); ok {
+			fmt.Println("Players: ", v)
+		}
+	})
+
+	r.Execute("ListPlayers")
 
   // Use to prevent the program from ending
   select {}
@@ -53,15 +66,17 @@ func main() {
 
 ## Rcon Events
 
-| Function            | Callback param type |
-| ------------------- | ------------------- |
-| **OnClose**         | **Error**           |
-| **OnData**          | **String**          |
-| **OnWarn**          | **Warn**            |
-| **OnKick**          | **Kick**            |
-| **OnMessage**       | **Message**         |
-| **OnPosAdminCam**   | **PosAdminCam**     |
-| **OnUnposAdminCam** | **UnposAdminCam**   |
-| **OnSquadCreated**  | **SquadCreated**    |
-| **OnListPlayers**   | **Players**         |
-| **OnListSquads**    | **Squads**          |
+| Function                     | Callback param type |
+| ---------------------------- | ------------------- |
+| **connected**                | **nil**             |
+| **close**                    | **nil**             |
+| **error**                    | **Error**           |
+| **data**                     | **String**          |
+| **PLAYER_WARNED**            | **Warn**            |
+| **PLAYER_KICKED**            | **Kick**            |
+| **CHAT_MESSAGE**             | **Message**         |
+| **POSSESSED_ADMIN_CAMERA**   | **PosAdminCam**     |
+| **UNPOSSESSED_ADMIN_CAMERA** | **UnposAdminCam**   |
+| **SQUAD_CREATED**            | **SquadCreated**    |
+| **ListPlayers**              | **Players**         |
+| **ListSquads**               | **Squads**          |

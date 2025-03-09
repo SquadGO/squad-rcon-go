@@ -5,10 +5,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"syscall"
 	"time"
+
+	"github.com/iamalone98/eventEmitter"
 
 	p "github.com/SquadGO/squad-rcon-go/internal/parser"
 	"github.com/SquadGO/squad-rcon-go/internal/utils"
@@ -34,40 +35,49 @@ type SquadCreated p.SquadCreated
 type Players p.Players
 type Squads p.Squads
 
-type Rcon struct {
-	connected       bool
-	client          net.Conn
-	host            string
-	port            string
-	password        string
-	responseBody    string
-	lastCommand     string
-	lastDataBuffer  []byte
-	executeChan     chan string
-	onClose         func(error)
-	onData          func(string)
-	onWarn          func(Warn)
-	onKick          func(Kick)
-	onMessage       func(Message)
-	onPosAdminCam   func(PosAdminCam)
-	onUnposAdminCam func(UnposAdminCam)
-	onSquadCreated  func(SquadCreated)
-	onListPlayers   func(Players)
-	onListSquads    func(Squads)
+type RconConfig struct {
+	host               string
+	port               string
+	password           string
+	autoReconnect      bool
+	autoReconnectDelay int
 }
 
-func Dial(host, port, password string) (*Rcon, error) {
+type Rcon struct {
+	emitter            eventEmitter.EventEmitter
+	connected          bool
+	reconnecting       bool
+	client             net.Conn
+	host               string
+	port               string
+	password           string
+	responseBody       string
+	lastCommand        string
+	autoReconnect      bool
+	autoReconnectDelay int
+	lastDataBuffer     []byte
+	executeChan        chan string
+}
+
+func NewRcon(config RconConfig) (*Rcon, error) {
+	c := config
 	r := &Rcon{
-		connected:      false,
-		lastDataBuffer: make([]byte, 0),
-		executeChan:    make(chan string),
+		emitter:            eventEmitter.NewEventEmitter(),
+		host:               c.host,
+		port:               c.port,
+		password:           c.password,
+		connected:          false,
+		lastDataBuffer:     make([]byte, 0),
+		executeChan:        make(chan string),
+		autoReconnect:      c.autoReconnect,
+		autoReconnectDelay: c.autoReconnectDelay,
 	}
 
-	if err := r.connect(host, port); err != nil {
+	if err := r.connect(); err != nil {
 		return nil, err
 	}
 
-	if err := r.auth(password); err != nil {
+	if err := r.auth(); err != nil {
 		return nil, err
 	}
 
@@ -89,6 +99,12 @@ func (r *Rcon) Close() {
 
 		close(r.executeChan)
 		r.client.Close()
+
+		r.emitter.Emit("close", true)
+
+		if r.autoReconnect && r.autoReconnectDelay > 0 {
+			r.reconnect(r.autoReconnectDelay)
+		}
 	}
 }
 
@@ -107,24 +123,52 @@ func (r *Rcon) Execute(command string) string {
 	return ""
 }
 
-func (r *Rcon) connect(host, port string) error {
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%s", host, port), 5*time.Second)
+func (r *Rcon) connect() error {
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%s", r.host, r.port), 5*time.Second)
+	r.reconnecting = false
+
 	if err != nil {
-		return fmt.Errorf("Connection error: %w", err)
+		msg := fmt.Errorf("[RCON] Connection error: %w", err)
+		r.emitter.Emit("error", msg)
+		return msg
 	}
 
 	r.client = conn
 	r.connected = true
 
+	r.emitter.Emit("connected", true)
+
 	return nil
 }
 
-func (r *Rcon) auth(password string) error {
-	if _, err := r.client.Write(utils.Encode(serverDataAuth, authPacketID, password)); err != nil {
-		return fmt.Errorf("Authorization error: %w", err)
+func (r *Rcon) auth() error {
+	if _, err := r.client.Write(utils.Encode(serverDataAuth, authPacketID, r.password)); err != nil {
+		msg := fmt.Errorf("[RCON] Authorization error: %w", err)
+		r.emitter.Emit("error", msg)
+		return msg
 	}
 
 	return nil
+}
+
+func (r *Rcon) reconnect(delay int) {
+	ticker := time.NewTicker(time.Duration(delay) * time.Second)
+	go func() {
+	loop:
+		for {
+			select {
+			case <-ticker.C:
+				if r.connected {
+					break loop
+				}
+
+				if !r.reconnecting {
+					r.reconnecting = true
+					r.connect()
+				}
+			}
+		}
+	}()
 }
 
 func (r *Rcon) ping() {
@@ -162,12 +206,7 @@ func (r *Rcon) byteReader() {
 		r.byteParser(b)
 	}
 
-	if r.onClose != nil {
-		r.onClose(err)
-	} else {
-		log.Fatalln(err)
-	}
-
+	r.emitter.Emit("error", err)
 	r.Close()
 }
 
@@ -188,15 +227,11 @@ func (r *Rcon) byteParser(b byte) {
 			switch data := p.CommandParser(r.responseBody, r.lastCommand).(type) {
 			case p.Players:
 				{
-					if r.onListPlayers != nil {
-						r.onListPlayers(Players(data))
-					}
+					r.emitter.Emit("ListPlayers", Players(data))
 				}
 			case p.Squads:
 				{
-					if r.onListSquads != nil {
-						r.onListSquads(Squads(data))
-					}
+					r.emitter.Emit("ListSquads", Squads(data))
 				}
 			}
 
@@ -212,46 +247,32 @@ func (r *Rcon) byteParser(b byte) {
 			}
 
 			if packet.Type == serverDataServer {
-				if r.onData != nil {
-					r.onData(packet.Body)
-				}
+				r.emitter.Emit("data", packet.Body)
 
 				switch data := p.ChatParser(packet.Body).(type) {
 				case p.Warn:
 					{
-						if r.onWarn != nil {
-							r.onWarn(Warn(data))
-						}
+						r.emitter.Emit("PLAYER_WARNED", Warn(data))
 					}
 				case p.Kick:
 					{
-						if r.onKick != nil {
-							r.onKick(Kick(data))
-						}
+						r.emitter.Emit("PLAYER_KICKED", Kick(data))
 					}
 				case p.Message:
 					{
-						if r.onMessage != nil {
-							r.onMessage(Message(data))
-						}
+						r.emitter.Emit("CHAT_MESSAGE", Message(data))
 					}
 				case p.PosAdminCam:
 					{
-						if r.onPosAdminCam != nil {
-							r.onPosAdminCam(PosAdminCam(data))
-						}
+						r.emitter.Emit("POSSESSED_ADMIN_CAMERA", PosAdminCam(data))
 					}
 				case p.UnposAdminCam:
 					{
-						if r.onUnposAdminCam != nil {
-							r.onUnposAdminCam(UnposAdminCam(data))
-						}
+						r.emitter.Emit("UNPOSSESSED_ADMIN_CAMERA", UnposAdminCam(data))
 					}
 				case p.SquadCreated:
 					{
-						if r.onSquadCreated != nil {
-							r.onSquadCreated(SquadCreated(data))
-						}
+						r.emitter.Emit("SQUAD_CREATED", SquadCreated(data))
 					}
 				}
 			}
