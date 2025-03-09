@@ -64,19 +64,19 @@ func main() {
 }
 ```
 
-## Rcon Events
+## Listeners
 
-| Function                     | Callback param type |
-| ---------------------------- | ------------------- |
-| **connected**                | **nil**             |
-| **close**                    | **nil**             |
-| **error**                    | **Error**           |
-| **data**                     | **String**          |
-| **PLAYER_WARNED**            | **Warn**            |
-| **PLAYER_KICKED**            | **Kick**            |
-| **CHAT_MESSAGE**             | **Message**         |
-| **POSSESSED_ADMIN_CAMERA**   | **PosAdminCam**     |
-| **UNPOSSESSED_ADMIN_CAMERA** | **UnposAdminCam**   |
-| **SQUAD_CREATED**            | **SquadCreated**    |
-| **ListPlayers**              | **Players**         |
-| **ListSquads**               | **Squads**          |
+| Listener                     | Returns           |
+| ---------------------------- | ----------------- |
+| **connected**                | **nil**           |
+| **close**                    | **nil**           |
+| **error**                    | **Error**         |
+| **data**                     | **String**        |
+| **PLAYER_WARNED**            | **Warn**          |
+| **PLAYER_KICKED**            | **Kick**          |
+| **CHAT_MESSAGE**             | **Message**       |
+| **POSSESSED_ADMIN_CAMERA**   | **PosAdminCam**   |
+| **UNPOSSESSED_ADMIN_CAMERA** | **UnposAdminCam** |
+| **SQUAD_CREATED**            | **SquadCreated**  |
+| **ListPlayers**              | **Players**       |
+| **ListSquads**               | **Squads**        |
