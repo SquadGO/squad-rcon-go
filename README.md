@@ -17,47 +17,47 @@ import (
 )
 
 func main() {
-	r, err := rcon.NewRcon(rcon.RconConfig{host: "127.0.0.1", password: "123456", port: "27165", autoReconnect: true, autoReconnectDelay: 5})
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+  r, err := rcon.NewRcon(rcon.RconConfig{host: "127.0.0.1", password: "123456", port: "27165", autoReconnect: true, autoReconnectDelay: 5})
+  if err != nil {
+    fmt.Println(err)
+    return
+  }
 
-	defer r.Close()
+  defer r.Close()
 
-	fmt.Println("[RCON] Connection successful")
+  fmt.Println("[RCON] Connection successful")
 
   /* Listeners works after first initialization */
 
-	r.emitter.On("connected", func(_ interface{}) {
-		fmt.Println("[RCON] Connection successful")
-	})
+  r.emitter.On("connected", func(_ interface{}) {
+    fmt.Println("[RCON] Connection successful")
+  })
 
   r.emitter.On("close", func(_ interface{}) {
-		fmt.Println("[RCON] Connection closed")
-	})
+    fmt.Println("[RCON] Connection closed")
+  })
 
-	r.emitter.On("error", func(err interface{}) {
-		fmt.Println(err)
-	})
+  r.emitter.On("error", func(err interface{}) {
+    fmt.Println(err)
+  })
 
-	r.emitter.On("data", func(data interface{}) {
-		fmt.Println("Data: ", data)
-	})
+  r.emitter.On("data", func(data interface{}) {
+    fmt.Println("Data: ", data)
+  })
 
   r.emitter.On("CHAT_MESSAGE", func(data interface{}) {
-		if v, ok := data.(rcon.Message); ok {
-			fmt.Println("Message: ", v.Message)
-		}
-	})
+    if v, ok := data.(rcon.Message); ok {
+      fmt.Println("Message: ", v.Message)
+    }
+  })
 
-	r.emitter.On("ListPlayers", func(data interface{}) {
-		if v, ok := data.(rcon.Players); ok {
-			fmt.Println("Players: ", v)
-		}
-	})
+  r.emitter.On("ListPlayers", func(data interface{}) {
+    if v, ok := data.(rcon.Players); ok {
+      fmt.Println("Players: ", v)
+    }
+  })
 
-	r.Execute("ListPlayers")
+  r.Execute("ListPlayers")
 
   // Use to prevent the program from ending
   select {}
