@@ -11,8 +11,8 @@ import (
 
 	"github.com/iamalone98/eventEmitter"
 
-	p "github.com/SquadGO/squad-rcon-go/internal/parser"
-	"github.com/SquadGO/squad-rcon-go/internal/utils"
+	p "github.com/SquadGO/squad-rcon-go/v2/internal/parser"
+	"github.com/SquadGO/squad-rcon-go/v2/internal/utils"
 )
 
 const (
@@ -36,15 +36,15 @@ type Players p.Players
 type Squads p.Squads
 
 type RconConfig struct {
-	host               string
-	port               string
-	password           string
-	autoReconnect      bool
-	autoReconnectDelay int
+	Host               string
+	Port               string
+	Password           string
+	AutoReconnect      bool
+	AutoReconnectDelay int
 }
 
 type Rcon struct {
-	emitter            eventEmitter.EventEmitter
+	Emitter            eventEmitter.EventEmitter
 	connected          bool
 	reconnecting       bool
 	client             net.Conn
@@ -62,15 +62,15 @@ type Rcon struct {
 func NewRcon(config RconConfig) (*Rcon, error) {
 	c := config
 	r := &Rcon{
-		emitter:            eventEmitter.NewEventEmitter(),
-		host:               c.host,
-		port:               c.port,
-		password:           c.password,
+		Emitter:            eventEmitter.NewEventEmitter(),
+		host:               c.Host,
+		port:               c.Port,
+		password:           c.Password,
 		connected:          false,
 		lastDataBuffer:     make([]byte, 0),
 		executeChan:        make(chan string),
-		autoReconnect:      c.autoReconnect,
-		autoReconnectDelay: c.autoReconnectDelay,
+		autoReconnect:      c.AutoReconnect,
+		autoReconnectDelay: c.AutoReconnectDelay,
 	}
 
 	if err := r.connect(); err != nil {
@@ -100,7 +100,7 @@ func (r *Rcon) Close() {
 		close(r.executeChan)
 		r.client.Close()
 
-		r.emitter.Emit("close", true)
+		r.Emitter.Emit("close", true)
 
 		if r.autoReconnect && r.autoReconnectDelay > 0 {
 			r.reconnect(r.autoReconnectDelay)
@@ -129,14 +129,14 @@ func (r *Rcon) connect() error {
 
 	if err != nil {
 		msg := fmt.Errorf("[RCON] Connection error: %w", err)
-		r.emitter.Emit("error", msg)
+		r.Emitter.Emit("error", msg)
 		return msg
 	}
 
 	r.client = conn
 	r.connected = true
 
-	r.emitter.Emit("connected", true)
+	r.Emitter.Emit("connected", true)
 
 	return nil
 }
@@ -144,7 +144,7 @@ func (r *Rcon) connect() error {
 func (r *Rcon) auth() error {
 	if _, err := r.client.Write(utils.Encode(serverDataAuth, authPacketID, r.password)); err != nil {
 		msg := fmt.Errorf("[RCON] Authorization error: %w", err)
-		r.emitter.Emit("error", msg)
+		r.Emitter.Emit("error", msg)
 		return msg
 	}
 
@@ -206,7 +206,7 @@ func (r *Rcon) byteReader() {
 		r.byteParser(b)
 	}
 
-	r.emitter.Emit("error", err)
+	r.Emitter.Emit("error", err)
 	r.Close()
 }
 
@@ -227,11 +227,11 @@ func (r *Rcon) byteParser(b byte) {
 			switch data := p.CommandParser(r.responseBody, r.lastCommand).(type) {
 			case p.Players:
 				{
-					r.emitter.Emit("ListPlayers", Players(data))
+					r.Emitter.Emit("ListPlayers", Players(data))
 				}
 			case p.Squads:
 				{
-					r.emitter.Emit("ListSquads", Squads(data))
+					r.Emitter.Emit("ListSquads", Squads(data))
 				}
 			}
 
@@ -247,32 +247,32 @@ func (r *Rcon) byteParser(b byte) {
 			}
 
 			if packet.Type == serverDataServer {
-				r.emitter.Emit("data", packet.Body)
+				r.Emitter.Emit("data", packet.Body)
 
 				switch data := p.ChatParser(packet.Body).(type) {
 				case p.Warn:
 					{
-						r.emitter.Emit("PLAYER_WARNED", Warn(data))
+						r.Emitter.Emit("PLAYER_WARNED", Warn(data))
 					}
 				case p.Kick:
 					{
-						r.emitter.Emit("PLAYER_KICKED", Kick(data))
+						r.Emitter.Emit("PLAYER_KICKED", Kick(data))
 					}
 				case p.Message:
 					{
-						r.emitter.Emit("CHAT_MESSAGE", Message(data))
+						r.Emitter.Emit("CHAT_MESSAGE", Message(data))
 					}
 				case p.PosAdminCam:
 					{
-						r.emitter.Emit("POSSESSED_ADMIN_CAMERA", PosAdminCam(data))
+						r.Emitter.Emit("POSSESSED_ADMIN_CAMERA", PosAdminCam(data))
 					}
 				case p.UnposAdminCam:
 					{
-						r.emitter.Emit("UNPOSSESSED_ADMIN_CAMERA", UnposAdminCam(data))
+						r.Emitter.Emit("UNPOSSESSED_ADMIN_CAMERA", UnposAdminCam(data))
 					}
 				case p.SquadCreated:
 					{
-						r.emitter.Emit("SQUAD_CREATED", SquadCreated(data))
+						r.Emitter.Emit("SQUAD_CREATED", SquadCreated(data))
 					}
 				}
 			}
