@@ -11,7 +11,7 @@ import (
 
 	"github.com/iamalone98/eventEmitter"
 
-	p "github.com/SquadGO/squad-rcon-go/v2/internal/parser"
+	"github.com/SquadGO/squad-rcon-go/v2/internal/parser"
 	"github.com/SquadGO/squad-rcon-go/v2/internal/utils"
 )
 
@@ -25,15 +25,6 @@ const (
 	authPacketID     = 101
 	executeCommandID = 50
 )
-
-type Warn p.Warn
-type Kick p.Kick
-type Message p.Message
-type PosAdminCam p.PosAdminCam
-type UnposAdminCam p.UnposAdminCam
-type SquadCreated p.SquadCreated
-type Players p.Players
-type Squads p.Squads
 
 type RconConfig struct {
 	Host               string
@@ -224,17 +215,9 @@ func (r *Rcon) byteParser(b byte) {
 			r.lastDataBuffer[5] == 0 &&
 			r.lastDataBuffer[6] == 0 {
 
-			switch data := p.CommandParser(r.responseBody, r.lastCommand).(type) {
-			case p.Players:
-				{
-					r.Emitter.Emit("ListPlayers", Players(data))
-				}
-			case p.Squads:
-				{
-					r.Emitter.Emit("ListSquads", Squads(data))
-				}
-			}
+			parser.RconParser(r.responseBody, r.lastCommand, r.Emitter)
 
+			r.lastCommand = ""
 			r.executeChan <- r.responseBody
 			r.responseBody = ""
 			r.lastDataBuffer = make([]byte, 0)
@@ -242,39 +225,13 @@ func (r *Rcon) byteParser(b byte) {
 
 		if int32(len(r.lastDataBuffer)) == size {
 			packet := utils.Decode(r.lastDataBuffer)
+
 			if packet.Type == serverDataResponse && packet.ID != authPacketID && packet.ID != emptyPacketID {
 				r.responseBody += packet.Body
 			}
 
 			if packet.Type == serverDataServer {
-				r.Emitter.Emit("data", packet.Body)
-
-				switch data := p.ChatParser(packet.Body).(type) {
-				case p.Warn:
-					{
-						r.Emitter.Emit("PLAYER_WARNED", Warn(data))
-					}
-				case p.Kick:
-					{
-						r.Emitter.Emit("PLAYER_KICKED", Kick(data))
-					}
-				case p.Message:
-					{
-						r.Emitter.Emit("CHAT_MESSAGE", Message(data))
-					}
-				case p.PosAdminCam:
-					{
-						r.Emitter.Emit("POSSESSED_ADMIN_CAMERA", PosAdminCam(data))
-					}
-				case p.UnposAdminCam:
-					{
-						r.Emitter.Emit("UNPOSSESSED_ADMIN_CAMERA", UnposAdminCam(data))
-					}
-				case p.SquadCreated:
-					{
-						r.Emitter.Emit("SQUAD_CREATED", SquadCreated(data))
-					}
-				}
+				parser.RconParser(packet.Body, r.lastCommand, r.Emitter)
 			}
 
 			r.lastDataBuffer = r.lastDataBuffer[size:]

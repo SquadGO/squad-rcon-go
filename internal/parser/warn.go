@@ -1,0 +1,32 @@
+package parser
+
+import (
+	"regexp"
+	"strings"
+
+	"github.com/SquadGO/squad-rcon-go/v2/rconEvents"
+)
+
+type Warn struct {
+	Raw        string
+	PlayerName string
+	Message    string
+}
+
+func warn(line string) (event string, data interface{}) {
+	var re *regexp.Regexp
+	var matches []string
+
+	re = regexp.MustCompile(`Remote admin has warned player (.*)\. Message was "([\s\S]*?)"`)
+	matches = re.FindStringSubmatch(line)
+
+	if matches != nil {
+		return rconEvents.PLAYER_WARNED, Warn{
+			Raw:        line,
+			PlayerName: strings.TrimSpace(matches[1]),
+			Message:    matches[2],
+		}
+	}
+
+	return rconEvents.PLAYER_WARNED, nil
+}

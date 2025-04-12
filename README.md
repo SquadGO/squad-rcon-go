@@ -14,6 +14,8 @@ go get -u github.com/SquadGO/squad-rcon-go/v2
 import (
   "fmt"
   rcon "github.com/SquadGO/squad-rcon-go/v2"
+  "github.com/SquadGO/squad-rcon-go/v2/rconEvents"
+	"github.com/SquadGO/squad-rcon-go/v2/rconTypes"
 )
 
 func main() {
@@ -45,19 +47,19 @@ func main() {
     fmt.Println("Data: ", data)
   })
 
-  r.Emitter.On("CHAT_MESSAGE", func(data interface{}) {
-    if v, ok := data.(rcon.Message); ok {
+  r.Emitter.On(rconEvents.CHAT_MESSAGE, func(data interface{}) {
+    if v, ok := data.(rconTypes.Message); ok {
       fmt.Println("Message: ", v.Message)
     }
   })
 
-  r.Emitter.On("ListPlayers", func(data interface{}) {
-    if v, ok := data.(rcon.Players); ok {
+  r.Emitter.On(rconEvents.LIST_PLAYERS, func(data interface{}) {
+    if v, ok := data.(rconTypes.Players); ok {
       fmt.Println("Players: ", v)
     }
   })
 
-  r.Execute("ListPlayers")
+  r.Execute(rconEvents.LIST_PLAYERS)
 
   // Use to prevent the program from ending
   select {}
@@ -80,3 +82,6 @@ func main() {
 | **SQUAD_CREATED**            | **SquadCreated**  |
 | **ListPlayers**              | **Players**       |
 | **ListSquads**               | **Squads**        |
+| **ShowCurrentMap**           | **CurrentMap**    |
+| **ShowNextMap**              | **NextMap**       |
+| **ShowServerInfo**           | **ServerInfo**    |
