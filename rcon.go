@@ -13,6 +13,7 @@ import (
 
 	"github.com/SquadGO/squad-rcon-go/v2/internal/parser"
 	"github.com/SquadGO/squad-rcon-go/v2/internal/utils"
+	"github.com/SquadGO/squad-rcon-go/v2/rconEvents"
 )
 
 const (
@@ -91,7 +92,7 @@ func (r *Rcon) Close() {
 		close(r.executeChan)
 		r.client.Close()
 
-		r.Emitter.Emit("close", true)
+		r.Emitter.Emit(rconEvents.CLOSE, true)
 
 		if r.autoReconnect && r.autoReconnectDelay > 0 {
 			r.reconnect(r.autoReconnectDelay)
@@ -120,14 +121,14 @@ func (r *Rcon) connect() error {
 
 	if err != nil {
 		msg := fmt.Errorf("[RCON] Connection error: %w", err)
-		r.Emitter.Emit("error", msg)
+		r.Emitter.Emit(rconEvents.ERROR, msg)
 		return msg
 	}
 
 	r.client = conn
 	r.connected = true
 
-	r.Emitter.Emit("connected", true)
+	r.Emitter.Emit(rconEvents.CONNECTED, true)
 
 	return nil
 }
@@ -135,7 +136,7 @@ func (r *Rcon) connect() error {
 func (r *Rcon) auth() error {
 	if _, err := r.client.Write(utils.Encode(serverDataAuth, authPacketID, r.password)); err != nil {
 		msg := fmt.Errorf("[RCON] Authorization error: %w", err)
-		r.Emitter.Emit("error", msg)
+		r.Emitter.Emit(rconEvents.ERROR, msg)
 		return msg
 	}
 
@@ -197,7 +198,7 @@ func (r *Rcon) byteReader() {
 		r.byteParser(b)
 	}
 
-	r.Emitter.Emit("error", err)
+	r.Emitter.Emit(rconEvents.ERROR, err)
 	r.Close()
 }
 

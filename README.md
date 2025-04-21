@@ -31,19 +31,19 @@ func main() {
 
   /* Listeners works after first initialization */
 
-  r.Emitter.On("connected", func(_ interface{}) {
+  r.Emitter.On(rconEvents.CONNECTED, func(_ interface{}) {
     fmt.Println("[RCON] Connection successful")
   })
 
-  r.Emitter.On("close", func(_ interface{}) {
+  r.Emitter.On(rconEvents.CLOSE, func(_ interface{}) {
     fmt.Println("[RCON] Connection closed")
   })
 
-  r.Emitter.On("error", func(err interface{}) {
+  r.Emitter.On(rconEvents.ERROR, func(err interface{}) {
     fmt.Println(err)
   })
 
-  r.Emitter.On("data", func(data interface{}) {
+  r.Emitter.On(rconEvents.DATA, func(data interface{}) {
     fmt.Println("Data: ", data)
   })
 
@@ -70,18 +70,19 @@ func main() {
 
 | Listener                     | Returns           |
 | ---------------------------- | ----------------- |
-| **connected**                | **nil**           |
-| **close**                    | **nil**           |
-| **error**                    | **Error**         |
-| **data**                     | **String**        |
+| **CONNECTED**                | **nil**           |
+| **CLOSE**                    | **nil**           |
+| **ERROR**                    | **Error**         |
+| **DATA**                     | **String**        |
+| **CHAT_MESSAGE**             | **Message**       |
+| **SQUAD_CREATED**            | **SquadCreated**  |
 | **PLAYER_WARNED**            | **Warn**          |
 | **PLAYER_KICKED**            | **Kick**          |
-| **CHAT_MESSAGE**             | **Message**       |
+| **PLAYER_BANNED**            | **Ban**           |
 | **POSSESSED_ADMIN_CAMERA**   | **PosAdminCam**   |
 | **UNPOSSESSED_ADMIN_CAMERA** | **UnposAdminCam** |
-| **SQUAD_CREATED**            | **SquadCreated**  |
-| **ListPlayers**              | **Players**       |
-| **ListSquads**               | **Squads**        |
-| **ShowCurrentMap**           | **CurrentMap**    |
-| **ShowNextMap**              | **NextMap**       |
-| **ShowServerInfo**           | **ServerInfo**    |
+| **LIST_PLAYERS**             | **Players**       |
+| **LIST_SQUADS**              | **Squads**        |
+| **SHOW_SERVER_INFO**         | **ServerInfo**    |
+| **SHOW_CURRENT_MAP**         | **CurrentMap**    |
+| **SHOW_NEXT_MAP**            | **NextMap**       |

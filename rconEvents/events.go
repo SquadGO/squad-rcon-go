@@ -16,4 +16,11 @@ const (
 	SHOW_CURRENT_MAP = "ShowCurrentMap"
 	SHOW_NEXT_MAP    = "ShowNextMap"
 	SHOW_SERVER_INFO = "ShowServerInfo"
+
+	/* CONNECTION */
+
+	CONNECTED = "connected"
+	CLOSE     = "close"
+	ERROR     = "error"
+	DATA      = "data"
 )

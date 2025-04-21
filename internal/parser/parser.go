@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"github.com/SquadGO/squad-rcon-go/v2/rconEvents"
 	"github.com/iamalone98/eventEmitter"
 )
 
@@ -30,7 +31,7 @@ func RconParser(line, command string, emitter eventEmitter.EventEmitter) {
 			event, data := fn(line, command)
 
 			if data != nil {
-				emitter.Emit("data", data)
+				emitter.Emit(rconEvents.DATA, data)
 				emitter.Emit(event, data)
 				break
 			}
@@ -40,7 +41,7 @@ func RconParser(line, command string, emitter eventEmitter.EventEmitter) {
 			event, data := fn(line)
 
 			if data != nil {
-				emitter.Emit("data", data)
+				emitter.Emit(rconEvents.DATA, data)
 				emitter.Emit(event, data)
 				break
 			}
