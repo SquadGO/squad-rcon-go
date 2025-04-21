@@ -5,14 +5,8 @@ import (
 	"strings"
 
 	"github.com/SquadGO/squad-rcon-go/v2/rconEvents"
+	"github.com/SquadGO/squad-rcon-go/v2/rconTypes"
 )
-
-type PosAdminCam struct {
-	Raw       string
-	EosID     string
-	SteamID   string
-	AdminName string
-}
 
 func posAdminCam(line string) (event string, data interface{}) {
 	var re *regexp.Regexp
@@ -22,7 +16,7 @@ func posAdminCam(line string) (event string, data interface{}) {
 	matches = re.FindStringSubmatch(line)
 
 	if matches != nil {
-		return rconEvents.POSSESSED_ADMIN_CAMERA, PosAdminCam{
+		return rconEvents.POSSESSED_ADMIN_CAMERA, rconTypes.PosAdminCam{
 			Raw:       line,
 			EosID:     matches[1],
 			SteamID:   matches[2],

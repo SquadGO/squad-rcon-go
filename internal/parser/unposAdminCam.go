@@ -5,14 +5,8 @@ import (
 	"strings"
 
 	"github.com/SquadGO/squad-rcon-go/v2/rconEvents"
+	"github.com/SquadGO/squad-rcon-go/v2/rconTypes"
 )
-
-type UnposAdminCam struct {
-	Raw       string
-	EosID     string
-	SteamID   string
-	AdminName string
-}
 
 func unposAdminCam(line string) (event string, data interface{}) {
 	var re *regexp.Regexp
@@ -22,7 +16,7 @@ func unposAdminCam(line string) (event string, data interface{}) {
 	matches = re.FindStringSubmatch(line)
 
 	if matches != nil {
-		return rconEvents.UNPOSSESSED_ADMIN_CAMERA, UnposAdminCam{
+		return rconEvents.UNPOSSESSED_ADMIN_CAMERA, rconTypes.UnposAdminCam{
 			Raw:       line,
 			EosID:     matches[1],
 			SteamID:   matches[2],

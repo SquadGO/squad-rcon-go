@@ -30,6 +30,7 @@ func RconParser(line, command string, emitter eventEmitter.EventEmitter) {
 			event, data := fn(line, command)
 
 			if data != nil {
+				emitter.Emit("data", data)
 				emitter.Emit(event, data)
 				break
 			}
@@ -39,6 +40,7 @@ func RconParser(line, command string, emitter eventEmitter.EventEmitter) {
 			event, data := fn(line)
 
 			if data != nil {
+				emitter.Emit("data", data)
 				emitter.Emit(event, data)
 				break
 			}

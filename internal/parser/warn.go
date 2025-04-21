@@ -5,13 +5,8 @@ import (
 	"strings"
 
 	"github.com/SquadGO/squad-rcon-go/v2/rconEvents"
+	"github.com/SquadGO/squad-rcon-go/v2/rconTypes"
 )
-
-type Warn struct {
-	Raw        string
-	PlayerName string
-	Message    string
-}
 
 func warn(line string) (event string, data interface{}) {
 	var re *regexp.Regexp
@@ -21,7 +16,7 @@ func warn(line string) (event string, data interface{}) {
 	matches = re.FindStringSubmatch(line)
 
 	if matches != nil {
-		return rconEvents.PLAYER_WARNED, Warn{
+		return rconEvents.PLAYER_WARNED, rconTypes.Warn{
 			Raw:        line,
 			PlayerName: strings.TrimSpace(matches[1]),
 			Message:    matches[2],

@@ -5,14 +5,8 @@ import (
 	"regexp"
 
 	"github.com/SquadGO/squad-rcon-go/v2/rconEvents"
+	"github.com/SquadGO/squad-rcon-go/v2/rconTypes"
 )
-
-type NextMap struct {
-	Raw      string
-	Level    string
-	Layer    string
-	Factions []string
-}
 
 func showNextMap(line, command string) (event string, data interface{}) {
 	if command == rconEvents.SHOW_NEXT_MAP {
@@ -25,7 +19,7 @@ func showNextMap(line, command string) (event string, data interface{}) {
 		fmt.Println(line)
 
 		if matches != nil {
-			return rconEvents.SHOW_NEXT_MAP, NextMap{
+			return rconEvents.SHOW_NEXT_MAP, rconTypes.NextMap{
 				Raw:   line,
 				Level: matches[1],
 				Layer: matches[2],

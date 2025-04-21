@@ -5,16 +5,8 @@ import (
 	"strings"
 
 	"github.com/SquadGO/squad-rcon-go/v2/rconEvents"
+	"github.com/SquadGO/squad-rcon-go/v2/rconTypes"
 )
-
-type Message struct {
-	Raw        string
-	ChatType   string
-	EosID      string
-	SteamID    string
-	PlayerName string
-	Message    string
-}
 
 func message(line string) (event string, data interface{}) {
 	var re *regexp.Regexp
@@ -24,7 +16,7 @@ func message(line string) (event string, data interface{}) {
 	matches = re.FindStringSubmatch(line)
 
 	if matches != nil {
-		return rconEvents.CHAT_MESSAGE, Message{
+		return rconEvents.CHAT_MESSAGE, rconTypes.Message{
 			Raw:        line,
 			ChatType:   matches[1],
 			EosID:      matches[2],

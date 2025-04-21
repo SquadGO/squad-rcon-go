@@ -5,25 +5,12 @@ import (
 	"strings"
 
 	"github.com/SquadGO/squad-rcon-go/v2/rconEvents"
+	"github.com/SquadGO/squad-rcon-go/v2/rconTypes"
 )
-
-type Player struct {
-	PlayerID   string
-	EosID      string
-	SteamID    string
-	PlayerName string
-	TeamID     string
-	SquadID    string
-	Role       string
-	IsLeader   bool
-	IsInSquad  bool
-}
-
-type Players []Player
 
 func listPlayers(line, command string) (event string, data interface{}) {
 	strs := strings.Split(line, "\n")
-	players := make(Players, 0)
+	players := make(rconTypes.Players, 0)
 
 	if command == rconEvents.LIST_PLAYERS {
 		for _, v := range strs {
@@ -34,7 +21,7 @@ func listPlayers(line, command string) (event string, data interface{}) {
 				continue
 			}
 
-			players = append(players, Player{
+			players = append(players, rconTypes.Player{
 				PlayerID:   matches[1],
 				EosID:      matches[2],
 				SteamID:    matches[3],

@@ -5,17 +5,8 @@ import (
 	"strings"
 
 	"github.com/SquadGO/squad-rcon-go/v2/rconEvents"
+	"github.com/SquadGO/squad-rcon-go/v2/rconTypes"
 )
-
-type SquadCreated struct {
-	Raw        string
-	PlayerName string
-	EosID      string
-	SteamID    string
-	SquadID    string
-	SquadName  string
-	TeamName   string
-}
 
 func squadCreated(line string) (event string, data interface{}) {
 	var re *regexp.Regexp
@@ -25,7 +16,7 @@ func squadCreated(line string) (event string, data interface{}) {
 	matches = re.FindStringSubmatch(line)
 
 	if matches != nil {
-		return rconEvents.SQUAD_CREATED, SquadCreated{
+		return rconEvents.SQUAD_CREATED, rconTypes.SquadCreated{
 			Raw:        line,
 			PlayerName: strings.TrimSpace(matches[1]),
 			EosID:      matches[2],

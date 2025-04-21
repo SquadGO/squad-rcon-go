@@ -5,15 +5,8 @@ import (
 	"strings"
 
 	"github.com/SquadGO/squad-rcon-go/v2/rconEvents"
+	"github.com/SquadGO/squad-rcon-go/v2/rconTypes"
 )
-
-type Kick struct {
-	Raw        string
-	PlayerID   string
-	EosID      string
-	SteamID    string
-	PlayerName string
-}
 
 func kick(line string) (event string, data interface{}) {
 	var re *regexp.Regexp
@@ -23,7 +16,7 @@ func kick(line string) (event string, data interface{}) {
 	matches = re.FindStringSubmatch(line)
 
 	if matches != nil {
-		return rconEvents.PLAYER_KICKED, Kick{
+		return rconEvents.PLAYER_KICKED, rconTypes.Kick{
 			Raw:        line,
 			PlayerID:   matches[1],
 			EosID:      matches[2],

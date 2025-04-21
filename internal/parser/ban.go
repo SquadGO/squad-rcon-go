@@ -6,15 +6,8 @@ import (
 	"strings"
 
 	"github.com/SquadGO/squad-rcon-go/v2/rconEvents"
+	"github.com/SquadGO/squad-rcon-go/v2/rconTypes"
 )
-
-type Ban struct {
-	Raw        string
-	PlayerID   string
-	SteamID    string
-	PlayerName string
-	Interval   int
-}
 
 func ban(line string) (event string, data interface{}) {
 	var re *regexp.Regexp
@@ -29,7 +22,7 @@ func ban(line string) (event string, data interface{}) {
 			return rconEvents.PLAYER_BANNED, nil
 		}
 
-		return rconEvents.PLAYER_BANNED, Ban{
+		return rconEvents.PLAYER_BANNED, rconTypes.Ban{
 			Raw:        line,
 			PlayerID:   matches[1],
 			SteamID:    matches[2],

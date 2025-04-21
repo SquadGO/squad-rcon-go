@@ -5,14 +5,8 @@ import (
 	"strings"
 
 	"github.com/SquadGO/squad-rcon-go/v2/rconEvents"
+	"github.com/SquadGO/squad-rcon-go/v2/rconTypes"
 )
-
-type CurrentMap struct {
-	Raw      string
-	Level    string
-	Layer    string
-	Factions []string
-}
 
 func showCurrentMap(line, command string) (event string, data interface{}) {
 	if command == rconEvents.SHOW_CURRENT_MAP {
@@ -23,7 +17,7 @@ func showCurrentMap(line, command string) (event string, data interface{}) {
 		matches = re.FindStringSubmatch(line)
 
 		if matches != nil {
-			return rconEvents.SHOW_CURRENT_MAP, CurrentMap{
+			return rconEvents.SHOW_CURRENT_MAP, rconTypes.CurrentMap{
 				Raw:      line,
 				Level:    matches[1],
 				Layer:    matches[2],
