@@ -15,7 +15,7 @@ import (
   "fmt"
   rcon "github.com/SquadGO/squad-rcon-go/v2"
   "github.com/SquadGO/squad-rcon-go/v2/rconEvents"
-	"github.com/SquadGO/squad-rcon-go/v2/rconTypes"
+  "github.com/SquadGO/squad-rcon-go/v2/rconTypes"
 )
 
 func main() {
