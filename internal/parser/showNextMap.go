@@ -16,8 +16,6 @@ func showNextMap(line, command string) (event string, data interface{}) {
 		re = regexp.MustCompile(`^Next level is (.*), layer is (.*)`)
 		matches = re.FindStringSubmatch(line)
 
-		fmt.Println(line)
-
 		if matches != nil {
 			return rconEvents.SHOW_NEXT_MAP, rconTypes.NextMap{
 				Raw:   line,
