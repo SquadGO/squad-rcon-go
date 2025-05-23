@@ -35,6 +35,10 @@ func main() {
     fmt.Println("[RCON] Connection successful")
   })
 
+  r.Emitter.On(rconEvents.RECONNECTING, func(_ interface{}) {
+    fmt.Println("[RCON] Reconnecting")
+  })
+
   r.Emitter.On(rconEvents.CLOSE, func(_ interface{}) {
     fmt.Println("[RCON] Connection closed")
   })
@@ -71,6 +75,7 @@ func main() {
 | Listener                     | Returns           |
 | ---------------------------- | ----------------- |
 | **CONNECTED**                | **nil**           |
+| **RECONNECTING**             | **nil**           |
 | **CLOSE**                    | **nil**           |
 | **ERROR**                    | **Error**         |
 | **DATA**                     | **String**        |

@@ -19,8 +19,9 @@ const (
 
 	/* CONNECTION */
 
-	CONNECTED = "connected"
-	CLOSE     = "close"
-	ERROR     = "error"
-	DATA      = "data"
+	RECONNECTING = "reconnecting"
+	CONNECTED    = "connected"
+	CLOSE        = "close"
+	ERROR        = "error"
+	DATA         = "data"
 )

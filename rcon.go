@@ -52,32 +52,29 @@ type Rcon struct {
 }
 
 func NewRcon(config RconConfig) (*Rcon, error) {
-	c := config
 	r := &Rcon{
 		Emitter:            eventEmitter.NewEventEmitter(),
-		host:               c.Host,
-		port:               c.Port,
-		password:           c.Password,
+		host:               config.Host,
+		port:               config.Port,
+		password:           config.Password,
 		connected:          false,
 		lastDataBuffer:     make([]byte, 0),
 		executeChan:        make(chan string),
-		autoReconnect:      c.AutoReconnect,
-		autoReconnectDelay: c.AutoReconnectDelay,
+		autoReconnect:      config.AutoReconnect,
+		autoReconnectDelay: config.AutoReconnectDelay,
 	}
+
+	r.Emitter.On(rconEvents.ERROR, func(i interface{}) {
+		r.connected = false
+
+		if r.autoReconnect && r.autoReconnectDelay > 0 && !r.reconnecting {
+			r.reconnect()
+		}
+	})
 
 	if err := r.connect(); err != nil {
 		return nil, err
 	}
-
-	if err := r.auth(); err != nil {
-		return nil, err
-	}
-
-	go func() {
-		r.byteReader()
-	}()
-
-	r.ping()
 
 	return r, nil
 }
@@ -86,17 +83,10 @@ func (r *Rcon) Close() {
 	if r.connected {
 		r.connected = false
 
-		r.lastCommand = ""
-		r.lastDataBuffer = make([]byte, 0)
-
-		close(r.executeChan)
+		r.reset()
 		r.client.Close()
 
 		r.Emitter.Emit(rconEvents.CLOSE, true)
-
-		if r.autoReconnect && r.autoReconnectDelay > 0 {
-			r.reconnect(r.autoReconnectDelay)
-		}
 	}
 }
 
@@ -106,18 +96,16 @@ func (r *Rcon) Execute(command string) string {
 
 	r.lastCommand = command
 
-	v, ok := <-r.executeChan
-
-	if ok {
+	select {
+	case v := <-r.executeChan:
 		return v
+	case <-time.After(5 * time.Second):
+		return ""
 	}
-
-	return ""
 }
 
 func (r *Rcon) connect() error {
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%s", r.host, r.port), 5*time.Second)
-	r.reconnecting = false
 
 	if err != nil {
 		msg := fmt.Errorf("[RCON] Connection error: %w", err)
@@ -126,7 +114,17 @@ func (r *Rcon) connect() error {
 	}
 
 	r.client = conn
+
+	if err := r.auth(); err != nil {
+		return err
+	}
+
+	go r.byteReader()
+
+	r.ping()
+
 	r.connected = true
+	r.reconnecting = false
 
 	r.Emitter.Emit(rconEvents.CONNECTED, true)
 
@@ -143,8 +141,8 @@ func (r *Rcon) auth() error {
 	return nil
 }
 
-func (r *Rcon) reconnect(delay int) {
-	ticker := time.NewTicker(time.Duration(delay) * time.Second)
+func (r *Rcon) reconnect() {
+	ticker := time.NewTicker(time.Duration(r.autoReconnectDelay) * time.Second)
 	go func() {
 	loop:
 		for {
@@ -154,10 +152,10 @@ func (r *Rcon) reconnect(delay int) {
 					break loop
 				}
 
-				if !r.reconnecting {
-					r.reconnecting = true
-					r.connect()
-				}
+				r.Emitter.Emit(rconEvents.RECONNECTING, true)
+				r.reconnecting = true
+				r.reset()
+				r.connect()
 			}
 		}
 	}()
@@ -166,11 +164,14 @@ func (r *Rcon) reconnect(delay int) {
 func (r *Rcon) ping() {
 	ticker := time.NewTicker(10 * time.Second)
 	go func() {
+	loop:
 		for {
 			select {
 			case <-ticker.C:
 				if r.connected {
 					r.Execute("PING_CONNECTION")
+				} else {
+					break loop
 				}
 			}
 		}
@@ -199,7 +200,6 @@ func (r *Rcon) byteReader() {
 	}
 
 	r.Emitter.Emit(rconEvents.ERROR, err)
-	r.Close()
 }
 
 func (r *Rcon) byteParser(b byte) {
@@ -238,4 +238,9 @@ func (r *Rcon) byteParser(b byte) {
 			r.lastDataBuffer = r.lastDataBuffer[size:]
 		}
 	}
+}
+
+func (r *Rcon) reset() {
+	r.lastCommand = ""
+	r.lastDataBuffer = make([]byte, 0)
 }

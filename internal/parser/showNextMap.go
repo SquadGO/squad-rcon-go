@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	"regexp"
 
 	"github.com/SquadGO/squad-rcon-go/v2/rconEvents"
