@@ -9,11 +9,8 @@ import (
 )
 
 func message(line string) (event string, data interface{}) {
-	var re *regexp.Regexp
-	var matches []string
-
-	re = regexp.MustCompile(`\[(ChatAll|ChatTeam|ChatSquad|ChatAdmin)] \[Online IDs:EOS: ([0-9a-f]{32}) steam: (\d{17})\] (.+?) : (.*)`)
-	matches = re.FindStringSubmatch(line)
+	re := regexp.MustCompile(`\[(ChatAll|ChatTeam|ChatSquad|ChatAdmin)] \[Online IDs:EOS: ([0-9a-f]{32}) steam: (\d{17})\] (.+?) : (.*)`)
+	matches := re.FindStringSubmatch(line)
 
 	if matches != nil {
 		return rconEvents.CHAT_MESSAGE, rconTypes.Message{

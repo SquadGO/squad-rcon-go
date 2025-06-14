@@ -44,7 +44,6 @@ type Rcon struct {
 	port               string
 	password           string
 	responseBody       string
-	lastCommand        string
 	autoReconnect      bool
 	autoReconnectDelay int
 	lastDataBuffer     []byte
@@ -93,8 +92,6 @@ func (r *Rcon) Close() {
 func (r *Rcon) Execute(command string) string {
 	r.client.Write(utils.Encode(serverDataCommand, executeCommandID, command))
 	r.client.Write(utils.Encode(serverDataCommand, emptyPacketID, ""))
-
-	r.lastCommand = command
 
 	select {
 	case v := <-r.executeChan:
@@ -216,9 +213,8 @@ func (r *Rcon) byteParser(b byte) {
 			r.lastDataBuffer[5] == 0 &&
 			r.lastDataBuffer[6] == 0 {
 
-			parser.RconParser(r.responseBody, r.lastCommand, r.Emitter)
+			parser.RconParser(r.responseBody, r.Emitter)
 
-			r.lastCommand = ""
 			r.executeChan <- r.responseBody
 			r.responseBody = ""
 			r.lastDataBuffer = make([]byte, 0)
@@ -232,7 +228,7 @@ func (r *Rcon) byteParser(b byte) {
 			}
 
 			if packet.Type == serverDataServer {
-				parser.RconParser(packet.Body, r.lastCommand, r.Emitter)
+				parser.RconParser(packet.Body, r.Emitter)
 			}
 
 			r.lastDataBuffer = r.lastDataBuffer[size:]
@@ -241,6 +237,5 @@ func (r *Rcon) byteParser(b byte) {
 }
 
 func (r *Rcon) reset() {
-	r.lastCommand = ""
 	r.lastDataBuffer = make([]byte, 0)
 }

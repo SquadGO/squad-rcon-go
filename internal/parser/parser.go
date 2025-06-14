@@ -5,10 +5,7 @@ import (
 	"github.com/iamalone98/eventEmitter"
 )
 
-type chatParser func(string) (event string, data interface{})
-type commandParser func(string, string) (event string, data interface{})
-
-var parsers = []chatParser{
+var parsers = []func(string) (event string, data interface{}){
 	ban,
 	kick,
 	message,
@@ -16,8 +13,7 @@ var parsers = []chatParser{
 	unposAdminCam,
 	squadCreated,
 	warn,
-}
-var commandParsers = []commandParser{
+	/* COMMANDS */
 	listPlayers,
 	listSquads,
 	showCurrentMap,
@@ -25,27 +21,18 @@ var commandParsers = []commandParser{
 	showServerInfo,
 }
 
-func RconParser(line, command string, emitter eventEmitter.EventEmitter) {
-	if len(command) > 0 {
-		for _, fn := range commandParsers {
-			event, data := fn(line, command)
-
-			if data != nil {
-				emitter.Emit(rconEvents.DATA, data)
-				emitter.Emit(event, data)
-				break
-			}
-		}
-	} else {
-		for _, fn := range parsers {
-			event, data := fn(line)
-
-			if data != nil {
-				emitter.Emit(rconEvents.DATA, data)
-				emitter.Emit(event, data)
-				break
-			}
-		}
+func RconParser(line string, emitter eventEmitter.EventEmitter) {
+	if len(line) == 0 {
+		return
 	}
 
+	for _, fn := range parsers {
+		event, data := fn(line)
+
+		if data != nil {
+			emitter.Emit(rconEvents.DATA, data)
+			emitter.Emit(event, data)
+			break
+		}
+	}
 }

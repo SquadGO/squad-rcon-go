@@ -9,46 +9,45 @@ import (
 	"github.com/SquadGO/squad-rcon-go/v2/rconTypes"
 )
 
-func listSquads(line, command string) (event string, data interface{}) {
+func listSquads(line string) (event string, data interface{}) {
+	re := regexp.MustCompile(`ID: ([0-9]+) \| Name: (.+) \| Size: ([0-9]+) \| Locked: (True|False) \| Creator Name: (.+) \| Creator Online IDs: EOS: ([0-9a-f]{32}) steam: (\d{17})`)
 	strs := strings.Split(line, "\n")
 	squads := make(rconTypes.Squads, 0)
 	teamID := 0
 	teamName := ""
 
-	if command == rconEvents.LIST_SQUADS {
-		for _, v := range strs {
-			re := regexp.MustCompile(`ID: ([0-9]+) \| Name: (.+) \| Size: ([0-9]+) \| Locked: (True|False) \| Creator Name: (.+) \| Creator Online IDs: EOS: ([0-9a-f]{32}) steam: (\d{17})`)
-			matches := re.FindStringSubmatch(v)
-
-			teamMatches := regexp.MustCompile(`Team ID: (1|2) \((.+)\)/`).FindStringSubmatch(v)
-
-			if teamMatches != nil {
-				if id, err := strconv.Atoi(teamMatches[1]); err == nil {
-					teamID = id
-				}
-
-				teamName = teamMatches[2]
+	for _, v := range strs {
+		matches := re.FindStringSubmatch(v)
+		teamMatches := regexp.MustCompile(`Team ID: (1|2) \((.+)\)/`).FindStringSubmatch(v)
+		if teamMatches != nil {
+			if id, err := strconv.Atoi(teamMatches[1]); err == nil {
+				teamID = id
 			}
 
-			if matches == nil {
-				continue
-			}
-
-			squads = append(squads, rconTypes.Squad{
-				SquadID:        matches[1],
-				SquadName:      matches[2],
-				Size:           matches[3],
-				Locked:         matches[4] == "True",
-				CreatorName:    matches[5],
-				CreatorEOSID:   matches[6],
-				CreatorSteamID: matches[7],
-				TeamID:         teamID,
-				TeamName:       teamName,
-			})
+			teamName = teamMatches[2]
 		}
 
-		return rconEvents.LIST_SQUADS, squads
+		if matches == nil {
+			continue
+		}
+
+		squads = append(squads, rconTypes.Squad{
+			SquadID:        matches[1],
+			SquadName:      matches[2],
+			Size:           matches[3],
+			Locked:         matches[4] == "True",
+			CreatorName:    matches[5],
+			CreatorEOSID:   matches[6],
+			CreatorSteamID: matches[7],
+			TeamID:         teamID,
+			TeamName:       teamName,
+		})
 	}
 
-	return rconEvents.LIST_SQUADS, nil
+	if len(squads) == 0 {
+		return rconEvents.LIST_SQUADS, nil
+	}
+
+	return rconEvents.LIST_SQUADS, squads
+
 }

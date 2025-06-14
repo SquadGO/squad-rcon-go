@@ -7,20 +7,15 @@ import (
 	"github.com/SquadGO/squad-rcon-go/v2/rconTypes"
 )
 
-func showNextMap(line, command string) (event string, data interface{}) {
-	if command == rconEvents.SHOW_NEXT_MAP {
-		var re *regexp.Regexp
-		var matches []string
+func showNextMap(line string) (event string, data interface{}) {
+	re := regexp.MustCompile(`^Next level is (.*), layer is (.*)`)
+	matches := re.FindStringSubmatch(line)
 
-		re = regexp.MustCompile(`^Next level is (.*), layer is (.*)`)
-		matches = re.FindStringSubmatch(line)
-
-		if matches != nil {
-			return rconEvents.SHOW_NEXT_MAP, rconTypes.NextMap{
-				Raw:   line,
-				Level: matches[1],
-				Layer: matches[2],
-			}
+	if matches != nil {
+		return rconEvents.SHOW_NEXT_MAP, rconTypes.NextMap{
+			Raw:   line,
+			Level: matches[1],
+			Layer: matches[2],
 		}
 	}
 

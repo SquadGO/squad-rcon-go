@@ -10,11 +10,8 @@ import (
 )
 
 func ban(line string) (event string, data interface{}) {
-	var re *regexp.Regexp
-	var matches []string
-
-	re = regexp.MustCompile(`Banned player ([0-9]+)\. \[steamid=(.*?)\] (.*) for interval (.*)`)
-	matches = re.FindStringSubmatch(line)
+	re := regexp.MustCompile(`Banned player ([0-9]+)\. \[steamid=(.*?)\] (.*) for interval (.*)`)
+	matches := re.FindStringSubmatch(line)
 
 	if matches != nil {
 		interval, err := strconv.Atoi(matches[4])

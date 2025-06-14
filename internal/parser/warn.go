@@ -9,11 +9,8 @@ import (
 )
 
 func warn(line string) (event string, data interface{}) {
-	var re *regexp.Regexp
-	var matches []string
-
-	re = regexp.MustCompile(`Remote admin has warned player (.*)\. Message was "([\s\S]*?)"`)
-	matches = re.FindStringSubmatch(line)
+	re := regexp.MustCompile(`Remote admin has warned player (.*)\. Message was "([\s\S]*?)"`)
+	matches := re.FindStringSubmatch(line)
 
 	if matches != nil {
 		return rconEvents.PLAYER_WARNED, rconTypes.Warn{
