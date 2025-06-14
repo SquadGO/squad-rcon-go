@@ -22,10 +22,6 @@ var parsers = []func(string) (event string, data interface{}){
 }
 
 func RconParser(line string, emitter eventEmitter.EventEmitter) {
-	if len(line) == 0 {
-		return
-	}
-
 	for _, fn := range parsers {
 		event, data := fn(line)
 
