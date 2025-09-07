@@ -19,7 +19,7 @@ import (
 )
 
 func main() {
-  r, err := rcon.NewRcon(context.Background(), rcon.RconConfig{Host: "127.0.0.1", Password: "123456", Port: "27165", AutoReconnect: true, AutoReconnectDelay: 5})
+  r, err := rcon.NewRcon(rcon.RconConfig{Host: "127.0.0.1", Password: "123456", Port: "27165", AutoReconnect: true, AutoReconnectDelay: 5})
   if err != nil {
     fmt.Println(err)
     return
