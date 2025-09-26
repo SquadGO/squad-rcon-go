@@ -2,10 +2,12 @@ package rcon
 
 import (
 	"bufio"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"syscall"
 	"time"
 
@@ -48,9 +50,19 @@ type Rcon struct {
 	autoReconnectDelay int
 	lastDataBuffer     []byte
 	executeChan        chan string
+	ctx                context.Context
+	cancel             context.CancelFunc
+	wg                 sync.WaitGroup
+	mu                 sync.RWMutex
 }
 
 func NewRcon(config RconConfig) (*Rcon, error) {
+	return NewRconWithContext(context.Background(), config)
+}
+
+func NewRconWithContext(ctx context.Context, config RconConfig) (*Rcon, error) {
+	rconCtx, cancel := context.WithCancel(ctx)
+
 	r := &Rcon{
 		Emitter:            eventEmitter.NewEventEmitter(),
 		host:               config.Host,
@@ -61,17 +73,31 @@ func NewRcon(config RconConfig) (*Rcon, error) {
 		executeChan:        make(chan string),
 		autoReconnect:      config.AutoReconnect,
 		autoReconnectDelay: config.AutoReconnectDelay,
+		ctx:                rconCtx,
+		cancel:             cancel,
 	}
 
 	r.Emitter.On(rconEvents.ERROR, func(i interface{}) {
-		r.connected = false
+		// Check if context is cancelled to avoid unnecessary reconnection attempts
+		select {
+		case <-rconCtx.Done():
+			return
+		default:
+		}
 
-		if r.autoReconnect && r.autoReconnectDelay > 0 && !r.reconnecting {
+		r.mu.Lock()
+		wasConnected := r.connected
+		r.connected = false
+		shouldReconnect := r.autoReconnect && r.autoReconnectDelay > 0 && !r.reconnecting && wasConnected
+		r.mu.Unlock()
+
+		if shouldReconnect {
 			r.reconnect()
 		}
 	})
 
 	if err := r.connect(); err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -79,26 +105,72 @@ func NewRcon(config RconConfig) (*Rcon, error) {
 }
 
 func (r *Rcon) Close() {
-	if r.connected {
-		r.connected = false
+	// First cancel context to signal all goroutines to stop
+	r.cancel()
 
-		r.reset()
+	// Close the connection to unblock any pending reads/writes
+	r.mu.Lock()
+	if r.client != nil {
 		r.client.Close()
+	}
+	wasConnected := r.connected
+	r.connected = false
+	r.mu.Unlock()
 
+	// Wait for all goroutines to finish
+	r.wg.Wait()
+
+	// Clean up resources
+	r.reset()
+
+	if wasConnected {
 		r.Emitter.Emit(rconEvents.CLOSE, true)
 	}
 }
 
 func (r *Rcon) Execute(command string) string {
-	r.client.Write(utils.Encode(serverDataCommand, executeCommandID, command))
-	r.client.Write(utils.Encode(serverDataCommand, emptyPacketID, ""))
+	// Check context first to avoid unnecessary operations if closing
+	select {
+	case <-r.ctx.Done():
+		return ""
+	default:
+	}
+
+	r.mu.RLock()
+	if !r.connected || r.client == nil {
+		r.mu.RUnlock()
+		return ""
+	}
+	client := r.client
+	r.mu.RUnlock()
+
+	// Use context-aware writes
+	if err := r.writeWithContext(client, utils.Encode(serverDataCommand, executeCommandID, command)); err != nil {
+		return ""
+	}
+	if err := r.writeWithContext(client, utils.Encode(serverDataCommand, emptyPacketID, "")); err != nil {
+		return ""
+	}
 
 	select {
 	case v := <-r.executeChan:
 		return v
 	case <-time.After(5 * time.Second):
 		return ""
+	case <-r.ctx.Done():
+		return ""
 	}
+}
+
+func (r *Rcon) writeWithContext(conn net.Conn, data []byte) error {
+	select {
+	case <-r.ctx.Done():
+		return fmt.Errorf("context cancelled")
+	default:
+	}
+
+	_, err := conn.Write(data)
+	return err
 }
 
 func (r *Rcon) connect() error {
@@ -110,18 +182,23 @@ func (r *Rcon) connect() error {
 		return msg
 	}
 
+	r.mu.Lock()
 	r.client = conn
+	r.mu.Unlock()
 
 	if err := r.auth(); err != nil {
 		return err
 	}
 
+	r.wg.Add(1)
 	go r.byteReader()
 
 	r.ping()
 
+	r.mu.Lock()
 	r.connected = true
 	r.reconnecting = false
+	r.mu.Unlock()
 
 	r.Emitter.Emit(rconEvents.CONNECTED, true)
 
@@ -129,7 +206,17 @@ func (r *Rcon) connect() error {
 }
 
 func (r *Rcon) auth() error {
-	if _, err := r.client.Write(utils.Encode(serverDataAuth, authPacketID, r.password)); err != nil {
+	r.mu.RLock()
+	client := r.client
+	r.mu.RUnlock()
+
+	if client == nil {
+		msg := fmt.Errorf("[RCON] No client connection available")
+		r.Emitter.Emit(rconEvents.ERROR, msg)
+		return msg
+	}
+
+	if _, err := client.Write(utils.Encode(serverDataAuth, authPacketID, r.password)); err != nil {
 		msg := fmt.Errorf("[RCON] Authorization error: %w", err)
 		r.Emitter.Emit(rconEvents.ERROR, msg)
 		return msg
@@ -139,36 +226,70 @@ func (r *Rcon) auth() error {
 }
 
 func (r *Rcon) reconnect() {
-	ticker := time.NewTicker(time.Duration(r.autoReconnectDelay) * time.Second)
+	r.wg.Add(1)
 	go func() {
-	loop:
+		defer r.wg.Done()
+
+		ticker := time.NewTicker(time.Duration(r.autoReconnectDelay) * time.Second)
+		defer ticker.Stop()
+
 		for {
 			select {
+			case <-r.ctx.Done():
+				return
 			case <-ticker.C:
-				if r.connected {
-					break loop
+				r.mu.RLock()
+				connected := r.connected
+				reconnecting := r.reconnecting
+				r.mu.RUnlock()
+
+				if connected {
+					return
+				}
+
+				// Prevent multiple concurrent reconnection attempts
+				if reconnecting {
+					continue
 				}
 
 				r.Emitter.Emit(rconEvents.RECONNECTING, true)
+				r.mu.Lock()
 				r.reconnecting = true
+				r.mu.Unlock()
+
 				r.reset()
-				r.connect()
+				if err := r.connect(); err != nil {
+					// Reset reconnecting flag on failed connection attempt
+					r.mu.Lock()
+					r.reconnecting = false
+					r.mu.Unlock()
+				}
 			}
 		}
 	}()
 }
 
 func (r *Rcon) ping() {
-	ticker := time.NewTicker(10 * time.Second)
+	r.wg.Add(1)
 	go func() {
-	loop:
+		defer r.wg.Done()
+
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
 		for {
 			select {
+			case <-r.ctx.Done():
+				return
 			case <-ticker.C:
-				if r.connected {
+				r.mu.RLock()
+				connected := r.connected
+				r.mu.RUnlock()
+
+				if connected {
 					r.Execute("PING_CONNECTION")
 				} else {
-					break loop
+					return
 				}
 			}
 		}
@@ -176,30 +297,56 @@ func (r *Rcon) ping() {
 }
 
 func (r *Rcon) byteReader() {
-	var err error
-	reader := bufio.NewReader(r.client)
+	defer r.wg.Done()
 
-	for {
-		b, e := reader.ReadByte()
-		if e != nil {
-			if errors.Is(e, syscall.ECONNRESET) {
-				err = fmt.Errorf("[RCON] Error: %w. Check password", e)
-			} else if errors.Is(e, syscall.EADDRNOTAVAIL) {
-				err = fmt.Errorf("[RCON] Error: %w. Connection lost", e)
-			} else {
-				err = fmt.Errorf("[RCON] Unknown error: %w", e)
-			}
+	r.mu.RLock()
+	client := r.client
+	r.mu.RUnlock()
 
-			break
-		}
-
-		r.byteParser(b)
+	if client == nil {
+		r.Emitter.Emit(rconEvents.ERROR, fmt.Errorf("[RCON] No client connection available"))
+		return
 	}
 
-	r.Emitter.Emit(rconEvents.ERROR, err)
+	reader := bufio.NewReader(client)
+
+	for {
+		select {
+		case <-r.ctx.Done():
+			return
+		default:
+			// Set a read deadline to prevent blocking indefinitely
+			client.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+
+			b, e := reader.ReadByte()
+			if e != nil {
+				// Check if it's a timeout error
+				if netErr, ok := e.(net.Error); ok && netErr.Timeout() {
+					continue // Continue the loop to check context cancellation
+				}
+
+				var err error
+				if errors.Is(e, syscall.ECONNRESET) {
+					err = fmt.Errorf("[RCON] Error: %w. Check password", e)
+				} else if errors.Is(e, syscall.EADDRNOTAVAIL) {
+					err = fmt.Errorf("[RCON] Error: %w. Connection lost", e)
+				} else {
+					err = fmt.Errorf("[RCON] Unknown error: %w", e)
+				}
+
+				r.Emitter.Emit(rconEvents.ERROR, err)
+				return
+			}
+
+			r.byteParser(b)
+		}
+	}
 }
 
 func (r *Rcon) byteParser(b byte) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.lastDataBuffer = append(r.lastDataBuffer, b)
 
 	if len(r.lastDataBuffer) >= 7 {
@@ -215,7 +362,15 @@ func (r *Rcon) byteParser(b byte) {
 
 			parser.RconParser(r.responseBody, r.Emitter)
 
-			r.executeChan <- r.responseBody
+			// Safely send response, handling closed context
+			select {
+			case r.executeChan <- r.responseBody:
+			case <-r.ctx.Done():
+				return
+			default:
+				// Channel might be full or receiver gone, skip
+			}
+
 			r.responseBody = ""
 			r.lastDataBuffer = make([]byte, 0)
 		}
@@ -237,5 +392,7 @@ func (r *Rcon) byteParser(b byte) {
 }
 
 func (r *Rcon) reset() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.lastDataBuffer = make([]byte, 0)
 }
