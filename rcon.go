@@ -78,11 +78,20 @@ func NewRconWithContext(ctx context.Context, config RconConfig) (*Rcon, error) {
 	}
 
 	r.Emitter.On(rconEvents.ERROR, func(i interface{}) {
+		// Check if context is cancelled to avoid unnecessary reconnection attempts
+		select {
+		case <-rconCtx.Done():
+			return
+		default:
+		}
+
 		r.mu.Lock()
+		wasConnected := r.connected
 		r.connected = false
+		shouldReconnect := r.autoReconnect && r.autoReconnectDelay > 0 && !r.reconnecting && wasConnected
 		r.mu.Unlock()
 
-		if r.autoReconnect && r.autoReconnectDelay > 0 && !r.reconnecting {
+		if shouldReconnect {
 			r.reconnect()
 		}
 	})
@@ -96,29 +105,37 @@ func NewRconWithContext(ctx context.Context, config RconConfig) (*Rcon, error) {
 }
 
 func (r *Rcon) Close() {
+	// First cancel context to signal all goroutines to stop
+	r.cancel()
+
+	// Close the connection to unblock any pending reads/writes
 	r.mu.Lock()
-	if r.connected {
-		r.connected = false
-		r.mu.Unlock()
+	if r.client != nil {
+		r.client.Close()
+	}
+	wasConnected := r.connected
+	r.connected = false
+	r.mu.Unlock()
 
-		// Cancel context to signal all goroutines to stop
-		r.cancel()
+	// Wait for all goroutines to finish
+	r.wg.Wait()
 
-		// Wait for all goroutines to finish
-		r.wg.Wait()
+	// Clean up resources
+	r.reset()
 
-		r.reset()
-		if r.client != nil {
-			r.client.Close()
-		}
-
+	if wasConnected {
 		r.Emitter.Emit(rconEvents.CLOSE, true)
-	} else {
-		r.mu.Unlock()
 	}
 }
 
 func (r *Rcon) Execute(command string) string {
+	// Check context first to avoid unnecessary operations if closing
+	select {
+	case <-r.ctx.Done():
+		return ""
+	default:
+	}
+
 	r.mu.RLock()
 	if !r.connected || r.client == nil {
 		r.mu.RUnlock()
@@ -127,8 +144,13 @@ func (r *Rcon) Execute(command string) string {
 	client := r.client
 	r.mu.RUnlock()
 
-	client.Write(utils.Encode(serverDataCommand, executeCommandID, command))
-	client.Write(utils.Encode(serverDataCommand, emptyPacketID, ""))
+	// Use context-aware writes
+	if err := r.writeWithContext(client, utils.Encode(serverDataCommand, executeCommandID, command)); err != nil {
+		return ""
+	}
+	if err := r.writeWithContext(client, utils.Encode(serverDataCommand, emptyPacketID, "")); err != nil {
+		return ""
+	}
 
 	select {
 	case v := <-r.executeChan:
@@ -138,6 +160,17 @@ func (r *Rcon) Execute(command string) string {
 	case <-r.ctx.Done():
 		return ""
 	}
+}
+
+func (r *Rcon) writeWithContext(conn net.Conn, data []byte) error {
+	select {
+	case <-r.ctx.Done():
+		return fmt.Errorf("context cancelled")
+	default:
+	}
+
+	_, err := conn.Write(data)
+	return err
 }
 
 func (r *Rcon) connect() error {
@@ -207,10 +240,16 @@ func (r *Rcon) reconnect() {
 			case <-ticker.C:
 				r.mu.RLock()
 				connected := r.connected
+				reconnecting := r.reconnecting
 				r.mu.RUnlock()
 
 				if connected {
 					return
+				}
+
+				// Prevent multiple concurrent reconnection attempts
+				if reconnecting {
+					continue
 				}
 
 				r.Emitter.Emit(rconEvents.RECONNECTING, true)
@@ -219,7 +258,12 @@ func (r *Rcon) reconnect() {
 				r.mu.Unlock()
 
 				r.reset()
-				r.connect()
+				if err := r.connect(); err != nil {
+					// Reset reconnecting flag on failed connection attempt
+					r.mu.Lock()
+					r.reconnecting = false
+					r.mu.Unlock()
+				}
 			}
 		}
 	}()
@@ -318,10 +362,13 @@ func (r *Rcon) byteParser(b byte) {
 
 			parser.RconParser(r.responseBody, r.Emitter)
 
+			// Safely send response, handling closed context
 			select {
 			case r.executeChan <- r.responseBody:
 			case <-r.ctx.Done():
 				return
+			default:
+				// Channel might be full or receiver gone, skip
 			}
 
 			r.responseBody = ""
